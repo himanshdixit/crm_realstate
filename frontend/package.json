@@ -1,0 +1,48 @@
+{
+  "name": "estateflow-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "perf:check": "node scripts/checkBundleBudget.mjs",
+    "start": "next start",
+    "lint": "eslint app components config constants hooks providers redux services utils validations tests scripts next.config.js postcss.config.js eslint.config.mjs",
+    "lint:fix": "npm run lint -- --fix",
+    "test": "node --test tests/*.test.js",
+    "test:coverage": "node --experimental-test-coverage --test tests/*.test.js",
+    "deploy:check": "node scripts/deploymentPreflight.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "@reduxjs/toolkit": "^2.12.0",
+    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-table": "^9.1.2",
+    "axios": "^1.19.0",
+    "chart.js": "^4.5.1",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^4.4.0",
+    "framer-motion": "^13.1.0",
+    "js-cookie": "^3.0.8",
+    "next": "^16.3.1",
+    "react": "^19.2.8",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.85.0",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.7.0",
+    "react-loading-skeleton": "^3.5.0",
+    "react-redux": "^9.3.0",
+    "redux-persist": "^6.0.0",
+    "sweetalert2": "^11.26.25",
+    "swiper": "^14.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
+    "tailwindcss": "^4.3.3"
+  }
+}

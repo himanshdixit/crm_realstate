@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #7375f3;
+  --color-brand-600: #6366f1;
+  --color-brand-700: #4f46e5;
+  --color-brand-800: #4338ca;
+  --color-brand-900: #3730a3;
+  --color-brand-950: #1e1b4b;
+  --color-accent-50: #f0fdfa;
+  --color-accent-100: #ccfbf1;
+  --color-accent-200: #99f6e4;
+  --color-accent-300: #5eead4;
+  --color-accent-400: #2dd4bf;
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+  --color-accent-700: #0f766e;
+  --color-accent-800: #115e59;
+  --color-accent-900: #134e4a;
+  --color-accent-950: #042f2e;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --shadow-soft: 0 18px 50px -20px rgb(15 23 42 / 0.2);
+}
+
+:root {
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e2e8f0;
+  --foreground: #0f172a;
+  --muted: #64748b;
+}
+
+.dark {
+  --background: #020617;
+  --surface: #0f172a;
+  --surface-muted: #172033;
+  --border: #263449;
+  --foreground: #f1f5f9;
+  --muted: #98a5ba;
+  color-scheme: dark;
+}
+
+* { border-color: var(--border); }
+html { scroll-behavior: smooth; }
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button, a, input, select, textarea { outline-color: var(--color-brand-500); }
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
+
+::selection { background: var(--color-brand-200); color: var(--color-brand-950); }
+
+.surface { background: var(--surface); }
+.surface-muted { background: var(--surface-muted); }
+.text-muted { color: var(--muted); }
+.border-default { border-color: var(--border); }
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
+  --tw-ring-offset-color: var(--background);
+}
+
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

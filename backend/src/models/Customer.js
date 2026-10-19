@@ -1,0 +1,5 @@
+import mongoose from "mongoose";
+import { auditFields } from "./plugins/auditFields.js";
+const schema = new mongoose.Schema({ organization: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", default: null, index: true }, firstName: { type: String, required: true, trim: true, maxlength: 80 }, lastName: { type: String, required: true, trim: true, maxlength: 80 }, email: { type: String, lowercase: true, trim: true, default: null }, phone: { type: String, trim: true, required: true }, status: { type: String, enum: ["active", "inactive", "prospect"], default: "active", index: true }, assignedAgent: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true }, sourceLead: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", default: null }, notes: { type: String, maxlength: 3000, default: "" } }, { timestamps: true, versionKey: false });
+schema.plugin(auditFields); schema.index({ organization: 1, phone: 1 }, { unique: true }); schema.index({ organization: 1, email: 1 }, { unique: true, sparse: true });
+export const Customer = mongoose.model("Customer", schema);

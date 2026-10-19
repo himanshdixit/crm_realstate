@@ -1,0 +1,145 @@
+name: Production release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Commit, tag, or branch to release
+        required: true
+        default: main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Release quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Verify backend
+        working-directory: backend
+        run: npm ci && npm run lint && npm test
+      - name: Verify frontend
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.PRODUCTION_API_URL }}
+        run: npm ci && npm run deploy:check && npm run lint && npm test && npm run build && npm run perf:check
+
+  publish-backend:
+    name: Publish backend image
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        name: Resolve image name
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/estateflow-backend" >> "$GITHUB_OUTPUT"
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          target: runner
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=backend-production
+          cache-to: type=gha,mode=max,scope=backend-production
+          provenance: mode=max
+          sbom: true
+      - uses: aquasecurity/trivy-action@0.32.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: "1"
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+
+  deploy:
+    name: Deploy production
+    needs: [verify, publish-backend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_FRONTEND_URL }}
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+      PRODUCTION_FRONTEND_URL: ${{ vars.PRODUCTION_FRONTEND_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.ref }}
+      - name: Validate deployment configuration
+        run: |
+          test -n "$RENDER_API_KEY"
+          test -n "$RENDER_SERVICE_ID"
+          test -n "$VERCEL_TOKEN"
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          test -n "$PRODUCTION_API_URL"
+          test -n "$PRODUCTION_FRONTEND_URL"
+      - name: Deploy backend
+        env:
+          RENDER_IMAGE_URL: ${{ needs.publish-backend.outputs.image }}@${{ needs.publish-backend.outputs.digest }}
+        run: node scripts/deploy-render.mjs
+      - name: Wait for backend readiness
+        run: node scripts/verify-deployment.mjs "${PRODUCTION_API_URL%/}/health/ready" 30 10
+      - name: Deploy frontend
+        working-directory: frontend
+        run: |
+          npx --yes vercel@59.1.4 pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@59.1.4 build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@59.1.4 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      - name: Wait for frontend
+        run: node scripts/verify-deployment.mjs "$PRODUCTION_FRONTEND_URL" 30 10
+      - name: Production smoke tests
+        run: node scripts/production-smoke.mjs "$PRODUCTION_API_URL" "$PRODUCTION_FRONTEND_URL"
+      - name: Release summary
+        run: |
+          echo "### Production release" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend image: `${{ needs.publish-backend.outputs.image }}@${{ needs.publish-backend.outputs.digest }}`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: $PRODUCTION_API_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend: $PRODUCTION_FRONTEND_URL" >> "$GITHUB_STEP_SUMMARY"

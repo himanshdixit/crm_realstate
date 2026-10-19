@@ -1,0 +1,93 @@
+name: estateflow
+
+services:
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-crm_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DB_NAME:-Codex_realstate_db}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username '$$MONGO_INITDB_ROOT_USERNAME' --password '$$MONGO_INITDB_ROOT_PASSWORD' --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      target: runner
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      API_PREFIX: /api/v1
+      MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME:-crm_admin}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
+      DB_NAME: ${DB_NAME:-Codex_realstate_db}
+      MONGODB_MIN_POOL_SIZE: ${MONGODB_MIN_POOL_SIZE:-2}
+      MONGODB_MAX_POOL_SIZE: ${MONGODB_MAX_POOL_SIZE:-20}
+      MONGODB_MAX_IDLE_TIME_MS: ${MONGODB_MAX_IDLE_TIME_MS:-60000}
+      CORS_ORIGINS: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:-EstateFlow <no-reply@example.com>}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_FIRST_NAME: ${ADMIN_FIRST_NAME:-System}
+      ADMIN_LAST_NAME: ${ADMIN_LAST_NAME:-Administrator}
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - web
+      - data
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runner
+      args:
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-EstateFlow}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000/api/v1}
+        NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-en}
+        NEXT_PUBLIC_DEFAULT_TIMEZONE: ${NEXT_PUBLIC_DEFAULT_TIMEZONE:-Asia/Kolkata}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - web
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  mongodb_data:
+
+networks:
+  web:
+  data:
+    internal: true
